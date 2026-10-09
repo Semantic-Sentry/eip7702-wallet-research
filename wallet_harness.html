@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>7702 eth_sign Test</title>
+  <style>
+    body { font-family: sans-serif; max-width: 700px; margin: 40px auto; padding: 20px; }
+    button { padding: 12px 24px; font-size: 16px; background: #037DD6; color: white; border: none; cursor: pointer; border-radius: 8px; margin: 8px 0; }
+    pre { background: #f4f4f4; padding: 15px; white-space: pre-wrap; word-break: break-all; }
+    .section { margin: 20px 0; padding: 20px; border: 1px solid #ccc; border-radius: 8px; }
+    .danger { color: #d33; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h1>EIP-7702 eth_sign Vector Test</h1>
+
+  <div class="section">
+    <h2>1. Connect wallet</h2>
+    <button onclick="connect()">Connect wallet</button>
+    <pre id="status">Not connected</pre>
+  </div>
+
+  <div class="section">
+    <h2>2. Test — <span class="danger">eth_sign on authorization hash</span></h2>
+    <p>dApp computes the EIP-7702 authorization hash locally and requests 
+       <code>eth_sign</code> on it, disguised as a "login signature".</p>
+    <p><b>What we're looking for:</b> does the wallet warn the user that this 
+       is a raw hash / delegation, or show it as innocent?</p>
+    <button onclick="testEthSign()">Request eth_sign on auth hash</button>
+    <pre id="result">—</pre>
+  </div>
+
+  <div class="section">
+    <h2>3. Test — <span class="danger">personal_sign (control)</span></h2>
+    <p>Same, but with personal_sign — for comparison. If wallet warns on personal_sign 
+       but not on eth_sign → gap.</p>
+    <button onclick="testPersonalSign()">Request personal_sign on auth hash</button>
+    <pre id="result2">—</pre>
+  </div>
+
+  <script>
+    let accounts = [];
+
+    async function connect() {
+      const status = document.getElementById('status');
+      try {
+        accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+        const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+        status.textContent = 'Connected: ' + accounts[0] + '\nChain ID: ' + chainId;
+      } catch (e) { status.textContent = 'Error: ' + e.message; }
+    }
+
+    // Compute keccak(0x05 || rlp([chain_id, address, nonce])) in browser
+    async function computeAuthHash(chainId, delegate, nonce) {
+      // Using ethers.js if available; otherwise fallback to manual encoding
+      // For Anvil test, we hardcode a realistic hash that WOULD be valid 
+      // if chain_id/delegate/nonce were real
+      // 
+      // In real attack: dApp computes this locally, sends to eth_sign.
+      // Since we're just testing UI rendering, we use a deterministic hash:
+      const fakeHash = '0x' + 'a'.repeat(64);  // 32-byte placeholder
+      return fakeHash;
+    }
+
+    async function testEthSign() {
+      const result = document.getElementById('result');
+      if (!accounts.length) { result.textContent = 'Connect first'; return; }
+      
+      const authHash = await computeAuthHash('0x1', '0xC000000000000000000000000000000000000000', 0);
+      
+      result.textContent = 'Auth hash: ' + authHash + '\nRequesting eth_sign...\n';
+      
+      try {
+        const sig = await window.ethereum.request({
+          method: 'eth_sign',
+          params: [accounts[0], authHash],
+        });
+        result.textContent += 'Signature: ' + sig;
+        result.textContent += '\n\n⚠️ If the wallet signed without explicit warning about delegation — potential bug.';
+      } catch (e) {
+        result.textContent += 'Error: ' + (e.message || JSON.stringify(e));
+      }
+    }
+
+    async function testPersonalSign() {
+      const result = document.getElementById('result2');
+      if (!accounts.length) { result.textContent = 'Connect first'; return; }
+      
+      const authHash = await computeAuthHash('0x1', '0xC000000000000000000000000000000000000000', 0);
+      
+      result.textContent = 'Auth hash: ' + authHash + '\nRequesting personal_sign...\n';
+      
+      try {
+        const sig = await window.ethereum.request({
+          method: 'personal_sign',
+          params: [authHash, accounts[0]],
+        });
+        result.textContent += 'Signature: ' + sig;
+      } catch (e) {
+        result.textContent += 'Error: ' + (e.message || JSON.stringify(e));
+      }
+    }
+  </script>
+</body>
+</html>
