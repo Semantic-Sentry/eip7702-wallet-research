@@ -1,4 +1,3 @@
-cat > ~/eip7702-wallet-research/README.md << 'EOF'
 # EIP-7702 Wallet Research
 
 Negative finding + methodology from testing three popular browser extension wallets against EIP-7702 (Pectra) attack surface.
